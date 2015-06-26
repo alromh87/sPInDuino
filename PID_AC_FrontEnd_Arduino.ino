@@ -8,7 +8,7 @@
 
 #include <PID_v1.h>
 
-//#define DEBUG 1
+#define DEBUG 1
 #define FAST_ALG 1
 
 /* Definicion de pines */
@@ -26,9 +26,9 @@
 volatile byte zeroBit = LOW; // declare IRQ flag
  // HIGH = 1, LOW = 0
   
-volatile unsigned long rpmcount;
-volatile unsigned long time;
-volatile unsigned long timeold;
+volatile unsigned long rpmcount = 0;
+volatile unsigned long time          = 0;
+volatile unsigned long timeold     = 0;
 
 unsigned long rpm;
 float impuls_time;
@@ -40,13 +40,13 @@ float maxDelay = .7*(1000000/(float)120); //Retraso maximo: Perido de media señ
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output;
 
-    //Define the aggressive and conservative Tuning Parameters
-    //double consKp=4, consKi=0.2, consKd=1;
-    //double consKp=0.4, consKi=0.001, consKd=1;
-    //double consKp=4, consKi=0.2, consKd=1;
-    double consKp=1, consKi=0.4, consKd=0.01; //100% work
-    //double consKp=0.4, consKi=0.001, consKd=1;
-    //double consKp=0.1, consKi=0.5, consKd=0.05;
+//Define the aggressive and conservative Tuning Parameters
+//double consKp=4, consKi=0.2, consKd=1;
+//double consKp=0.4, consKi=0.001, consKd=1;
+//double consKp=4, consKi=0.2, consKd=1;
+double consKp=1, consKi=0.4, consKd=0.01; //100% work
+//double consKp=0.4, consKi=0.001, consKd=1;
+//double consKp=0.1, consKi=0.5, consKd=0.05;
 
 //Specify the links and initial tuning parameters
 PID myPID(&Input, &Output, &Setpoint, consKp, consKi, consKd, REVERSE);
@@ -58,11 +58,13 @@ void setup()
   //initialize the serial link with processing
   Serial.begin(115200);
 //  Serial.begin(9600);
-  
+
+  pinMode(INPUT_PIN, INPUT);  
   //initialize the variables we're linked to
+
   Input = 0;
-  
-  pinMode(INPUT_PIN, INPUT);
+  rpm =0;
+
   Setpoint = analogRead(INPUT_PIN);
 
 //Triac control setup  
@@ -118,10 +120,11 @@ if(Setpoint<255)return;
   
     myPID.Compute();
 
-    retraso = (Output*(float)maxDelay)/255;
-//if(Output>1023)Output=1023;
+//    retraso = (Output*(float)maxDelay)/255;
+//if(Output>REF_MAX)Output=REF_MAX;
 //    retraso = (unsigned int)(Output*(float)maxDelay)/255.0;
-//    retraso=0;
+//    retraso=5900;
+        retraso=4700;
     
     if(retraso>0)
       delayMicroseconds(retraso);

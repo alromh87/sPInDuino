@@ -8,109 +8,138 @@
 
 #include <PID_v1.h>
 
-// TRIAC
-    #define triac_control 5 // Triac control - pin
-    
+//#define DEBUG 1
 
-//Zero Detect    
-    #define zero_detect 2 //Zero detect - pin
-    // when using values in the main routine and IRQ routine must be volatile value
-    volatile byte zero_bit = LOW; // declare IRQ flag
-    // HIGH = 1, LOW = 0
+/* Definicion de pines */
+#define INPUT_PIN                 0                //Referncia Analogica de valor deseado
+#define TRIAC_CONTROL    5   // Triac control - pin
+#define ZERO_DETECT        2       //Zero detect   - pin
+#define  RPM_SENSOR        3       //RPM sensor - pin
+
+/* Definiciones para calculo de RPM */
+#define MARCAS_SENSOR           8
+#define RPM_MAX                    35000
+#define REF_MAX                       1023
+
+ // when using values in the main routine and IRQ routine must be volatile value
+volatile byte zeroBit = LOW; // declare IRQ flag
+ // HIGH = 1, LOW = 0
   
-// HALL SENSOR 
-    #define  hallsensor 3 //- pin
-    unsigned int rpmcount;
-    unsigned int rpm;
-    unsigned long timeold;
-    
-        double retraso;
-    float maxDelay = .6*(1000000/120); //Retraso maximo: Perido de media señal senoidal en Microsegundos escalado al 90%
+unsigned long rpmcount;
+unsigned long rpm;
+unsigned long time;
+unsigned long timeold;
+float impuls_time;
+
+unsigned long timeMark = 0;
+int rpm2=0;
+  
+//unsigned int retraso;
+float retraso;
+float maxDelay = .6*(1000000/(float)120); //Retraso maximo: Perido de media señal senoidal en Microsegundos escalado al 90%
 
 
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output;
-int inputPin=0, outputPin=3;
+
+    //Define the aggressive and conservative Tuning Parameters
+    //double consKp=4, consKi=0.2, consKd=1;
+    //double consKp=0.4, consKi=0.001, consKd=1;
+    //double consKp=4, consKi=0.2, consKd=1;
+    double consKp=1, consKi=0.4, consKd=0.01; //100% work
+    //double consKp=0.4, consKi=0.001, consKd=1;
+    //double consKp=0.1, consKi=0.5, consKd=0.05;
 
 //Specify the links and initial tuning parameters
-PID myPID(&Input, &Output, &Setpoint,0.1,0.5,0.05, DIRECT);
-
+PID myPID(&Input, &Output, &Setpoint,consKp, consKi, consKd, REVERSE);
 
 unsigned long serialTime; //this will help us know when to talk with processing
 
 void setup()
 {
   //initialize the serial link with processing
-  Serial.begin(9600);
+  Serial.begin(115200);
+//  Serial.begin(9600);
   
   //initialize the variables we're linked to
-  Input = analogRead(inputPin);
+  Input = analogRead(INPUT_PIN);
   Setpoint = 100;
 
   //turn the PID on
   myPID.SetMode(AUTOMATIC);
 
 //Triac control setup  
-  pinMode(triac_control, OUTPUT);  
-  digitalWrite(triac_control, 0); // LED off
+  pinMode(TRIAC_CONTROL, OUTPUT);  
+  digitalWrite(TRIAC_CONTROL, 0); // LED off
   
   //Zero detect  
-  pinMode(zero_detect, INPUT);
-  digitalWrite(zero_detect, 1); // pull up on
+  pinMode(ZERO_DETECT, INPUT);
+  digitalWrite(ZERO_DETECT, 1); // pull up on
   attachInterrupt(0, zero_fun, FALLING);  // interrupt 0 digital pin 2 connected ZC circuit
 // Hall sensor  
-  pinMode(hallsensor, INPUT);
-  digitalWrite(hallsensor, 1); // pull up on
+  pinMode(RPM_SENSOR, INPUT);
+  digitalWrite(RPM_SENSOR, 1); // pull up on
   attachInterrupt(1, rpm_fun, FALLING);  // interrupt 1 digital pin 3 connected hall sensor
 
+  Serial.print("Iniciado ");
 }
 
-void loop()
-{
-  //pid-related code
-  Input = analogRead(inputPin);
-  myPID.Compute();
-  analogWrite(outputPin,Output);
-  
-  
-  
-  
-  unsigned long time = millis() - timeold;
-  if (rpmcount >= 20) {
-    float time_in_sec  = (float)time / 1000;
-    float impuls_time  = (float)rpmcount / time_in_sec;
-    rpm                = (int)impuls_time*60;
-    rpmcount = 0; //reset
-    timeold  = millis(); //set time
-  }    
-    
-//PID   
-  
-  Input = ((rpm/35000));//*1024);
-  myPID.Compute();
-//  Setpoint    = (analogRead(sensorPin)*35000)/1023;
+void loop(){
 
-  retraso = (1050-Output)*(maxDelay/255);
+//send-receive with processing if it's time
 
-//TRIAC delay control      
-  if (zero_bit == 1){
-          delayMicroseconds(retraso);
-          digitalWrite(triac_control, 1); //triac on 
-          delayMicroseconds(100); 
-          digitalWrite(triac_control, 0);  //triac off 
-          zero_bit = 0; // clear flag
-    }
-  
-    
-  //send-receive with processing if it's time
+#ifndef DEBUG
   if(millis()>serialTime)
   {
     SerialReceive();
     SerialSend();
     serialTime+=500;
   }
+#endif
   
+//  Setpoint    = (analogRead(INPUT_PIN)*35000)/(float)REF_MAX;
+    Setpoint    = analogRead(INPUT_PIN);
+if(Setpoint<255)return;
+//TRIAC delay control      
+  if (zeroBit == 1){
+    
+    //PID   
+    time = micros() - timeold;
+    float time_in_sec  = (float)time / 1000000;
+    impuls_time = (float)rpmcount / time_in_sec;
+    rpm                = impuls_time*60 / MARCAS_SENSOR;
+
+    timeold  = micros(); //set time
+    rpmcount = 0; //reset
   
+    Input = (rpm/(float)RPM_MAX)*REF_MAX;
+  
+    myPID.Compute();
+
+//    retraso = (Output*(float)maxDelay)/255;
+    retraso = (Output*(float)maxDelay)/255.0;
+    
+    if(retraso>0)
+      delayMicroseconds((int)retraso);
+    digitalWrite(TRIAC_CONTROL, 1); //triac on 
+    delayMicroseconds(100); 
+    digitalWrite(TRIAC_CONTROL, 0);  //triac off 
+    zeroBit = 0; // clear flag
+
+    #ifdef DEBUG
+      Serial.print(rpmcount);
+      Serial.print(" marcas en ");
+      Serial.print(time);
+      Serial.print("us ( ");
+      Serial.print(impuls_time);
+      Serial.print(") RPM: ");
+      Serial.print(rpm);
+      Serial.print(" vs  ");
+      Serial.print(rpm2);
+      Serial.print("   Retraso: ");
+      Serial.println(retraso);
+    #endif
+  }
 }
 
 
@@ -212,18 +241,21 @@ void SerialSend()
   if(myPID.GetMode()==AUTOMATIC) Serial.print("Automatic");
   else Serial.print("Manual");  
   Serial.print(" ");
-  if(myPID.GetDirection()==DIRECT) Serial.println("Direct");
-  else Serial.println("Reverse");
+  if(myPID.GetDirection()==DIRECT) Serial.print("Direct");
+  else Serial.print("Reverse");
+    Serial.print("  ");
+    Serial.println(retraso);
 }
 
-void zero_fun() // set bit
-  {
-    zero_bit = 1;
+void zero_fun(){
+    zeroBit = 1;
     // if zero detect set bit == 1
   } 
 
-void rpm_fun()
- {
+void rpm_fun(){
+   unsigned long timeT = micros();
+   rpm2 =(1000000/(8.0*(timeT-timeMark)))*60;
    rpmcount++;
+   timeMark = timeT;
    //Each rotation, this interrupt function is run
  }

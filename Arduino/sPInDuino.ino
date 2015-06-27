@@ -106,7 +106,10 @@ if(Setpoint<255)return;
     
     //PID
 #ifdef FAST_ALG
-    rpm = (60*(1000000/(time-timeold))) / MARCAS_SENSOR;
+    if((time-timeold)>0)
+      rpm = (60*(1000000/(time-timeold))) / MARCAS_SENSOR;
+    else
+      rpm = 0;
 #else
     time = micros();
     

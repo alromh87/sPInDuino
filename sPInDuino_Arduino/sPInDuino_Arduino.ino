@@ -88,7 +88,6 @@ void loop(){
     Setpoint    = analogRead(INPUT_PIN);
 //    Setpoint    = (analogRead(INPUT_PIN)*RPM_MAX)/(float)REF_MAX;
 
-
   if(Setpoint<10){
     Input=0;
     shoot=LOW;
@@ -117,7 +116,12 @@ void loop(){
 
     myPID.Compute();
     retraso = (Output*(float)maxDelay)/255.0;
-    
+
+ int out[] = {6800,6750,6500,6300,6000,5500,4700,3000};
+
+  int in[]  = {0,3772,67500,12300,92250,16275,22500,35000};
+    retraso=multiMap((analogRead(INPUT_PIN)*RPM_MAX)/(float)REF_MAX, in, out, 7);
+
     if(retraso<MIN_DELAY)
       retraso = MIN_DELAY;
     shoot = HIGH;
@@ -250,3 +254,21 @@ void rpm_fun(){
   //Each rotation, this interrupt function is run
    rpmcount++;
  }
+ 
+ int multiMap(int val, int* _in, int* _out, uint8_t size)
+{
+  // take care the value is within range
+  // val = constrain(val, _in[0], _in[size-1]);
+  if (val <= _in[0]) return _out[0];
+  if (val >= _in[size-1]) return _out[size-1];
+
+  // search right interval
+  uint8_t pos = 1;  // _in[0] allready tested
+  while(val > _in[pos]) pos++;
+
+  // this will handle all exact "points" in the _in array
+  if (val == _in[pos]) return _out[pos];
+
+  // interpolate in the right segment for the rest
+  return (val - _in[pos-1]) * (_out[pos] - _out[pos-1]) / (_in[pos] - _in[pos-1]) + _out[pos-1];
+}

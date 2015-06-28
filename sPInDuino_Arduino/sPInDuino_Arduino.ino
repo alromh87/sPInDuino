@@ -40,24 +40,12 @@ float maxDelay = .9*(1000000/(float)120); //Retraso maximo: Perido de media señ
 //Define Variables we'll be connecting to
 double Setpoint, Input, Output;
 
-//Define the aggressive and conservative Tuning Parameters
-//double consKp=4, consKi=0.2, consKd=1;
-//double consKp=0.4, consKi=0.001, consKd=1;
-//double consKp=4, consKi=0.2, consKd=1;
-double consKp=1, consKi=0.4, consKd=0.01; //100% work
-//double consKp=0.4, consKi=0.001, consKd=1;
-//double consKp=0.1, consKi=0.5, consKd=0.05;
-
-//Specify the links and initial tuning parameters
-PID myPID(&Input, &Output, &Setpoint, consKp, consKi, consKd, REVERSE);
-
 unsigned long serialTime=0; //this will help us know when to talk with processing
 
 void setup()
 {
   //initialize the serial link with processing
   Serial.begin(115200);
-//  Serial.begin(9600);
 
   pinMode(INPUT_PIN, INPUT);  
   //initialize the variables we're linked to
@@ -78,10 +66,6 @@ void setup()
   pinMode(RPM_SENSOR, INPUT);
   digitalWrite(RPM_SENSOR, 1); // pull up on
   attachInterrupt(1, rpm_fun, FALLING);  // interrupt 1 digital pin 3 connected hall sensor
-
-  //turn the PID on
-  myPID.SetMode(AUTOMATIC);
-
 }
 
 void loop(){
@@ -104,8 +88,7 @@ void loop(){
   }
 //TRIAC delay control      
   if (zeroBit == 1){
-    //PID
-//Input Atrasado?
+
     time = micros();
     rpm = ((1000000*(float)rpmcount / (float)(time-timeold))*60)/ MARCAS_SENSOR;
     timeold  = micros(); //set time
@@ -113,9 +96,6 @@ void loop(){
 
     Input = (rpm/(float)RPM_MAX)*REF_MAX;    
 //    Input =rpm;
-
-    myPID.Compute();
-    retraso = (Output*(float)maxDelay)/255.0;
 
  int out[] = {6800,6750,6500,6300,6000,5500,4700,3000};
 
@@ -205,13 +185,7 @@ void SerialReceive()
     p = double(foo.asFloat[3]);           //
     i = double(foo.asFloat[4]);           //
     d = double(foo.asFloat[5]);           //
-    myPID.SetTunings(p, i, d);            //
     
-    if(Auto_Man==0) myPID.SetMode(MANUAL);// * set the controller mode
-    else myPID.SetMode(AUTOMATIC);             //
-    
-    if(Direct_Reverse==0) myPID.SetControllerDirection(DIRECT);// * set the controller Direction
-    else myPID.SetControllerDirection(REVERSE);          //
   }
   Serial.flush();                         // * clear any random data from the serial buffer
 }
@@ -229,19 +203,17 @@ void SerialSend()
   Serial.print(" ");
   Serial.print(Output);   
   Serial.print(" ");
-  Serial.print(myPID.GetKp());   
+  Serial.print(0);   
   Serial.print(" ");
-  Serial.print(myPID.GetKi());   
+  Serial.print(0);   
   Serial.print(" ");
-  Serial.print(myPID.GetKd());   
+  Serial.print(0);   
   Serial.print(" ");
-  if(myPID.GetMode()==AUTOMATIC) Serial.print("Automatic");
-  else Serial.print("Manual");  
+  Serial.print("Manual");  
   Serial.print(" ");
-  if(myPID.GetDirection()==DIRECT) Serial.print("Direct");
-  else Serial.print("Reverse");
-    Serial.print("  ");
-    Serial.println(retraso);
+  Serial.print("Reverse");
+  Serial.print("  ");
+  Serial.println(retraso);
 }
 
 void zero_fun(){

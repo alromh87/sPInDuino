@@ -16,7 +16,7 @@
 
 /* Definiciones para calculo de RPM */
 #define MARCAS_SENSOR           8
-#define RPM_MAX                    30000
+#define RPM_MAX                    35000
 #define REF_MAX                       1023
 
  // when using values in the main routine and IRQ routine must be volatile value
@@ -28,11 +28,13 @@ volatile unsigned long rpmcount = 0;
 
 unsigned long time          = 0;
 unsigned long timeold     = 0;
+unsigned long shootAt     = 0;
 
 unsigned long rpm;
 
 unsigned int retraso;
-float maxDelay = .7*(1000000/(float)120); //Retraso maximo: Perido de media señal senoidal en Microsegundos escalado al 90%
+float maxDelay = .9*(1000000/(float)120); //Retraso maximo: Perido de media señal senoidal en Microsegundos escalado al 90%
+#define MIN_DELAY  500
 
 
 //Define Variables we'll be connecting to
@@ -71,7 +73,7 @@ void setup()
   //Zero detect  
   pinMode(ZERO_DETECT, INPUT);
   digitalWrite(ZERO_DETECT, 1); // pull up on
-  attachInterrupt(0, zero_fun, FALLING);  // interrupt 0 digital pin 2 connected ZC circuit
+  attachInterrupt(0, zero_fun, RISING);  // interrupt 0 digital pin 2 connected ZC circuit
 // Hall sensor  
   pinMode(RPM_SENSOR, INPUT);
   digitalWrite(RPM_SENSOR, 1); // pull up on
@@ -92,37 +94,44 @@ void loop(){
     serialTime+=500;
   }
  
-//  Setpoint    = (analogRead(INPUT_PIN)*35000)/(float)REF_MAX;
+//  Setpoint    = (analogRead(INPUT_PIN)*RPM_MAX)/(float)REF_MAX;
     Setpoint    = analogRead(INPUT_PIN);
 
   if(Setpoint<10){
     Input=0;
+    shoot=LOW;
     return;
   }
   
+  if(shoot){
+    if(micros() >= shootAt){
+      digitalWrite(TRIAC_CONTROL, 1); //triac on 
+      delayMicroseconds(100); 
+      digitalWrite(TRIAC_CONTROL, 0);  //triac off 
+      shoot=LOW;
+    }
+  }
 //TRIAC delay control      
   if (zeroBit == 1){
-
     //PID
-    Input = (rpm/(float)RPM_MAX)*REF_MAX;    
-
+//Input Atrasado?
     time = micros();
     rpm = ((1000000*(float)rpmcount / (float)(time-timeold))*60)/ MARCAS_SENSOR;
     timeold  = micros(); //set time
     rpmcount = 0; //reset
 
+    Input = (rpm/(float)RPM_MAX)*REF_MAX;    
+//    Input =rpm;
+
     myPID.Compute();
-
     retraso = (Output*(float)maxDelay)/255.0;
+    
+    if(retraso<MIN_DELAY)
+      retraso = MIN_DELAY;
+    shoot = HIGH;
+    shootAt=micros()+retraso;
 
-    if(retraso>0)
-      delayMicroseconds(retraso);
-    digitalWrite(TRIAC_CONTROL, 1); //triac on 
-    delayMicroseconds(100); 
-    digitalWrite(TRIAC_CONTROL, 0);  //triac off 
     zeroBit = 0; // clear flag
-
-
   }
 }
 
@@ -232,10 +241,11 @@ void SerialSend()
 }
 
 void zero_fun(){
-    zeroBit = 1;
-    // if zero detect set bit == 1
-  } 
-
+  zeroBit = 1;
+  // if zero detect set bit == 1
+  shoot =LOW;
+} 
+ 
 void rpm_fun(){
   //Each rotation, this interrupt function is run
    rpmcount++;

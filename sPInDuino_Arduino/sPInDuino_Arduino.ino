@@ -15,7 +15,7 @@
 #define  RPM_SENSOR        3       //RPM sensor - pin
 
 /* Definiciones para calculo de RPM */
-#define MARCAS_SENSOR           8
+#define MARCAS_SENSOR          16
 #define RPM_MAX                    35000
 #define REF_MAX                       1023
 
@@ -77,7 +77,7 @@ void setup()
 // Hall sensor  
   pinMode(RPM_SENSOR, INPUT);
   digitalWrite(RPM_SENSOR, 1); // pull up on
-  attachInterrupt(1, rpm_fun, FALLING);  // interrupt 1 digital pin 3 connected hall sensor
+  attachInterrupt(1, rpm_fun, CHANGE);  // interrupt 1 digital pin 3 connected hall sensor
 
   //turn the PID on
   myPID.SetMode(AUTOMATIC);

@@ -85,17 +85,9 @@ void setup()
 }
 
 void loop(){
-
-//send-receive with processing if it's time
-
-  if(millis()>serialTime){
-    SerialReceive();
-    SerialSend();
-    serialTime+=500;
-  }
- 
-//  Setpoint    = (analogRead(INPUT_PIN)*RPM_MAX)/(float)REF_MAX;
     Setpoint    = analogRead(INPUT_PIN);
+//    Setpoint    = (analogRead(INPUT_PIN)*RPM_MAX)/(float)REF_MAX;
+
 
   if(Setpoint<10){
     Input=0;
@@ -108,7 +100,7 @@ void loop(){
       digitalWrite(TRIAC_CONTROL, 1); //triac on 
       delayMicroseconds(100); 
       digitalWrite(TRIAC_CONTROL, 0);  //triac off 
-      shoot=LOW;
+      shoot = LOW;
     }
   }
 //TRIAC delay control      
@@ -133,6 +125,14 @@ void loop(){
 
     zeroBit = 0; // clear flag
   }
+  
+  //send-receive with processing if it's time
+  if(millis()>serialTime){
+    SerialReceive();
+    SerialSend();
+    serialTime+=500;
+  }
+
 }
 
 

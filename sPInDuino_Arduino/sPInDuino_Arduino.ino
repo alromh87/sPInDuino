@@ -8,9 +8,6 @@
 
 #include <PID_v1.h>
 
-//#define DEBUG 1
-//#define FAST_ALG 1
-
 /* Definicion de pines */
 #define INPUT_PIN                 0                //Referncia Analogica de valor deseado
 #define TRIAC_CONTROL    5   // Triac control - pin
@@ -19,19 +16,20 @@
 
 /* Definiciones para calculo de RPM */
 #define MARCAS_SENSOR           8
-#define RPM_MAX                    35000
+#define RPM_MAX                    30000
 #define REF_MAX                       1023
 
  // when using values in the main routine and IRQ routine must be volatile value
 volatile byte zeroBit = LOW; // declare IRQ flag
+volatile byte shoot = LOW;
  // HIGH = 1, LOW = 0
-  
+
 volatile unsigned long rpmcount = 0;
+
 unsigned long time          = 0;
 unsigned long timeold     = 0;
 
 unsigned long rpm;
-float impuls_time;
 
 unsigned int retraso;
 float maxDelay = .7*(1000000/(float)120); //Retraso maximo: Perido de media señal senoidal en Microsegundos escalado al 90%
@@ -88,15 +86,12 @@ void loop(){
 
 //send-receive with processing if it's time
 
-#ifndef DEBUG
-  if(millis()>serialTime)
-  {
+  if(millis()>serialTime){
     SerialReceive();
     SerialSend();
     serialTime+=500;
   }
-#endif
-  
+ 
 //  Setpoint    = (analogRead(INPUT_PIN)*35000)/(float)REF_MAX;
     Setpoint    = analogRead(INPUT_PIN);
 
@@ -108,19 +103,14 @@ void loop(){
 //TRIAC delay control      
   if (zeroBit == 1){
 
-    Input = (rpm/(float)RPM_MAX)*REF_MAX;    
     //PID
-#ifdef FAST_ALG
-    if((time-timeold)>0)
-      rpm = (60*(1000000/(time-timeold))) / MARCAS_SENSOR;
-    else
-      rpm = 0;
-#else
+    Input = (rpm/(float)RPM_MAX)*REF_MAX;    
+
     time = micros();
-    impuls_time = 1000000*(float)rpmcount / (float)(time-timeold);
-    rpm                = impuls_time*60 / MARCAS_SENSOR;
+    rpm = ((1000000*(float)rpmcount / (float)(time-timeold))*60)/ MARCAS_SENSOR;
     timeold  = micros(); //set time
-#endif
+    rpmcount = 0; //reset
+
     myPID.Compute();
 
     retraso = (Output*(float)maxDelay)/255.0;
@@ -133,18 +123,6 @@ void loop(){
     zeroBit = 0; // clear flag
 
 
-    #ifdef DEBUG
-      Serial.print(rpmcount);
-      Serial.print(" marcas en ");
-      Serial.print(time-timeold);
-      Serial.print("us ( ");
-      Serial.print(impuls_time);
-      Serial.print(") RPM: ");
-      Serial.print(rpm);
-      Serial.print("   Retraso: ");
-      Serial.println(retraso);
-    #endif
-    rpmcount = 0; //reset
   }
 }
 
@@ -260,10 +238,5 @@ void zero_fun(){
 
 void rpm_fun(){
   //Each rotation, this interrupt function is run
-#ifdef FAST_ALG
-   timeold = time;
-   time = micros();
-#else
    rpmcount++;
-#endif
  }

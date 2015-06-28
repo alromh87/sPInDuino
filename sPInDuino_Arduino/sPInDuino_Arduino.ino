@@ -8,8 +8,8 @@
 
 #include <PID_v1.h>
 
-#define DEBUG 1
-#define FAST_ALG 1
+//#define DEBUG 1
+//#define FAST_ALG 1
 
 /* Definicion de pines */
 #define INPUT_PIN                 0                //Referncia Analogica de valor deseado
@@ -27,8 +27,8 @@ volatile byte zeroBit = LOW; // declare IRQ flag
  // HIGH = 1, LOW = 0
   
 volatile unsigned long rpmcount = 0;
-volatile unsigned long time          = 0;
-volatile unsigned long timeold     = 0;
+unsigned long time          = 0;
+unsigned long timeold     = 0;
 
 unsigned long rpm;
 float impuls_time;
@@ -66,7 +66,6 @@ void setup()
   rpm =0;
 
   Setpoint = analogRead(INPUT_PIN);
-
 //Triac control setup  
   pinMode(TRIAC_CONTROL, OUTPUT);  
   digitalWrite(TRIAC_CONTROL, 0); // LED off
@@ -100,10 +99,16 @@ void loop(){
   
 //  Setpoint    = (analogRead(INPUT_PIN)*35000)/(float)REF_MAX;
     Setpoint    = analogRead(INPUT_PIN);
-if(Setpoint<255)return;
+
+  if(Setpoint<10){
+    Input=0;
+    return;
+  }
+  
 //TRIAC delay control      
   if (zeroBit == 1){
-    
+
+    Input = (rpm/(float)RPM_MAX)*REF_MAX;    
     //PID
 #ifdef FAST_ALG
     if((time-timeold)>0)
@@ -112,23 +117,14 @@ if(Setpoint<255)return;
       rpm = 0;
 #else
     time = micros();
-    
     impuls_time = 1000000*(float)rpmcount / (float)(time-timeold);
-    
     rpm                = impuls_time*60 / MARCAS_SENSOR;
     timeold  = micros(); //set time
 #endif
-
-    Input = (rpm/(float)RPM_MAX)*REF_MAX;
-  
     myPID.Compute();
 
-//    retraso = (Output*(float)maxDelay)/255;
-//if(Output>REF_MAX)Output=REF_MAX;
-//    retraso = (unsigned int)(Output*(float)maxDelay)/255.0;
-//    retraso=5900;
-        retraso=4700;
-    
+    retraso = (Output*(float)maxDelay)/255.0;
+
     if(retraso>0)
       delayMicroseconds(retraso);
     digitalWrite(TRIAC_CONTROL, 1); //triac on 
@@ -148,7 +144,6 @@ if(Setpoint<255)return;
       Serial.print("   Retraso: ");
       Serial.println(retraso);
     #endif
-
     rpmcount = 0; //reset
   }
 }

@@ -14,6 +14,9 @@
 #define ZERO_DETECT        2       //Zero detect   - pin
 #define  RPM_SENSOR        3       //RPM sensor - pin
 
+#define RPM_TEST                7
+#define ZERO_TEST              8
+
 /* Definiciones para calculo de RPM */
 #define MARCAS_SENSOR           8
 #define RPM_MAX                    35000
@@ -53,6 +56,8 @@ void setup()
   Input = 0;
   rpm =0;
 
+pinMode(RPM_TEST, OUTPUT); 
+pinMode(ZERO_TEST, OUTPUT); 
   Setpoint = analogRead(INPUT_PIN);
 //Triac control setup  
   pinMode(TRIAC_CONTROL, OUTPUT);  
@@ -65,7 +70,7 @@ void setup()
 // Hall sensor  
   pinMode(RPM_SENSOR, INPUT);
   digitalWrite(RPM_SENSOR, 1); // pull up on
-  attachInterrupt(1, rpm_fun, FALLING);  // interrupt 1 digital pin 3 connected hall sensor
+  attachInterrupt(1, rpm_fun, CHANGE);  // interrupt 1 digital pin 3 connected hall sensor
 }
 
 void loop(){
@@ -219,12 +224,14 @@ void SerialSend()
 void zero_fun(){
   zeroBit = 1;
   // if zero detect set bit == 1
+  digitalWrite(ZERO_TEST,!digitalRead(ZERO_TEST));
   shoot =LOW;
 } 
  
 void rpm_fun(){
   //Each rotation, this interrupt function is run
    rpmcount++;
+   digitalWrite(RPM_TEST,!digitalRead(RPM_TEST));
  }
  
  int multiMap(int val, int* _in, int* _out, uint8_t size)

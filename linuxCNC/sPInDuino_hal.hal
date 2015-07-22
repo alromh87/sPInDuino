@@ -1,0 +1,8 @@
+loadusr -W ./sPInDuino/sPInDuino_hal.py
+
+net spindle-velocity sPInDuino_hal.spindle-at => motion.spindle-speed-in
+#For Gmoccapy display
+net spindle-velocity sPInDuino_hal.spindle-at => gmoccapy.spindle_feedback_bar
+
+net spindle-speed sPInDuino_hal.spindle-cmd => motion.spindle-speed-out
+
